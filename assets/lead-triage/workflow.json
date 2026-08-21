@@ -1,0 +1,645 @@
+{
+  "name": "Automated Lead Triage",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lead-intake",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        192,
+        -80
+      ],
+      "id": "85d12516-51cc-470b-8a5d-7aa4ed0013ad",
+      "name": "Trigger",
+      "webhookId": "0fe884dd-c79a-466a-a28b-c8866844ddb7"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"status\": \"error\", \"errors\": $json.errors } }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1120,
+        16
+      ],
+      "id": "2df60dc2-0f3b-4ba0-b991-22344b0c81df",
+      "name": "Respond to Webhook1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.item.json.body || $input.item.json;\n\nconst errors = [];\n\nif (!body.name || typeof body.name !== 'string' || body.name.trim().length === 0) {\n  errors.push('Missing or invalid \"name\" field');\n}\n\nif (!body.email || typeof body.email !== 'string') {\n  errors.push('Missing \"email\" field');\n} else {\n  const emailPattern = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;\n  if (!emailPattern.test(body.email.trim())) {\n    errors.push('Invalid email format');\n  }\n}\n\nif (!body.message || typeof body.message !== 'string' || body.message.trim().length < 10) {\n  errors.push('Missing or too-short \"message\" field (minimum 10 characters)');\n}\n\nreturn {\n  isValid: errors.length === 0,\n  errors: errors,\n  name: (body.name || '').trim(),\n  email: (body.email || '').trim(),\n  message: (body.message || '').trim()\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        -80
+      ],
+      "id": "de3190be-af99-44f0-95b5-1be86adfde4f",
+      "name": "Validate input"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "3cb47663-48d4-46d4-8c53-c3318bcbc410",
+              "leftValue": "={{ $json.isValid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        672,
+        -80
+      ],
+      "id": "22e0975a-2bf8-4e25-a683-3ba23267b969",
+      "name": "Route on validity"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contents\": [\n    {\n      \"role\": \"user\",\n      \"parts\": [\n        {\n          \"text\": \"You are a lead qualification assistant for a small business. Classify the inbound lead below as Hot, Warm, or Cold using this exact rubric:\\n\\nHOT: Explicit buying intent (\\\"I want to book,\\\" \\\"ready to start,\\\" \\\"sign me up\\\"); a specific timeline (\\\"this week,\\\" \\\"by Friday,\\\" \\\"ASAP\\\"); budget or pricing tier already named or asked for directly and specifically; identifies themselves as the decision-maker; asks about next steps, contracts, or availability rather than general info.\\n\\nDo NOT score Hot if the message contains hedging or conditional language (\\\"if we can find the right fit,\\\" \\\"planning to,\\\" \\\"thinking about,\\\" \\\"might\\\") even alongside a timeline or pricing question \u2014 that combination is Warm, not Hot. A timeline alone is not sufficient for Hot without accompanying commitment language showing the decision is already made.\\n\\nWARM: Genuine interest but still exploring (\\\"looking into options,\\\" \\\"comparing a few providers\\\"); asks specific questions about services/pricing/process without committing language; no stated timeline or a vague one (\\\"sometime soon\\\"); engaged and detailed, not decision-ready yet.\\n\\nCOLD: Vague or generic inquiry with little specific detail; information-gathering only (\\\"just curious,\\\" \\\"what do you guys do\\\"); no timeline, budget, or role indicated; reads as templated, unrelated to services, or spam-like.\\n\\nLead message:\\n{{ $json.message }}\\n\\nOutput ONLY valid JSON, no markdown fences, no preamble, in this exact structure:\\n{\\\"score\\\": \\\"Hot\\\" | \\\"Warm\\\" | \\\"Cold\\\", \\\"reasoning\\\": \\\"one sentence citing the specific signal(s) from the message that drove this score\\\", \\\"keySignals\\\": [\\\"short phrase\\\", \\\"short phrase\\\"], \\\"hedgingLanguagePresent\\\": true | false}\"\n        }\n      ]\n    }\n  ],\n  \"generationConfig\": {\n    \"responseMimeType\": \"application/json\",\n    \"maxOutputTokens\": 2000,\n    \"temperature\": 0.2\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        896,
+        -144
+      ],
+      "id": "5e87853b-d818-4110-96f7-8ad678531dc0",
+      "name": "Classify Lead",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "lrMYcyYCdAHKrL5Q",
+          "name": "Gemini API"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"status\": \"error\", \"message\": \"Lead classification failed\", \"detail\": $json.error.message } }}",
+        "options": {
+          "responseCode": 502
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1344,
+        -96
+      ],
+      "id": "07414b7b-3ad4-4a22-8477-63fe78f81a7b",
+      "name": "Respond to Webhook2"
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $json.candidates?.[0]?.content?.parts?.[0]?.text;\n\nif (!raw) {\n  throw new Error('Classification call returned no content');\n}\n\nconst cleaned = raw.replace(/```json|```/g, '').trim();\n\nlet parsed;\ntry {\n  parsed = JSON.parse(cleaned);\n} catch (e) {\n  throw new Error('Classification response was not valid JSON: ' + cleaned.slice(0, 200));\n}\n\nconst validScores = ['Hot', 'Warm', 'Cold'];\nif (!validScores.includes(parsed.score)) {\n  throw new Error('Classification returned an invalid score: ' + parsed.score);\n}\n\nreturn {\n  score: parsed.score,\n  reasoning: parsed.reasoning || '',\n  keySignals: parsed.keySignals || [],\n  hedgingLanguagePresent: parsed.hedgingLanguagePresent || false\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        -192
+      ],
+      "id": "18b891d8-185c-4b8d-9ba0-a29059584a9f",
+      "name": "Check classification succeeded + parse",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  {\n    \"contents\": [\n      {\n        \"role\": \"user\",\n        \"parts\": [\n          {\n            \"text\": \"You are writing a reply on behalf of a small business owner to an inbound lead. The lead has been scored: \" + $('Check classification succeeded + parse').first().json.score + \"\\nReasoning for that score: \" + $('Check classification succeeded + parse').first().json.reasoning + \"\\n\\nWrite a personalized reply email to \" + $('Validate input').first().json.name + \" responding to their message below. Match the tone and urgency to the score:\\n\\n- If Hot: respond with clear enthusiasm and urgency. Propose a specific next step (a call this week, a quick form to lock in a time) rather than general info. Keep it short \u2014 they're ready to move, don't slow them down with a wall of text.\\n- If Warm: be warm and helpful, answer their specific question if one was asked, and offer a low-pressure next step (a resource, an optional call) without pushing urgency they haven't shown.\\n- If Cold: be friendly and brief. Answer generally, invite them to reach out again when they have more specifics, and do not push for a call or commitment.\\n\\nRequirements:\\n- 80-150 words\\n- Sign off as \\\"The Team\\\" (no invented personal name)\\n- No corporate boilerplate (\\\"We appreciate your interest in our services\\\")\\n- Output ONLY the email body text, no subject line, no preamble\\n\\nOriginal lead message:\\n\" + $('Validate input').first().json.message\n          }\n        ]\n      }\n    ],\n    \"generationConfig\": {\n      \"maxOutputTokens\": 2000,\n      \"temperature\": 0.7\n    }\n  }\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1344,
+        -288
+      ],
+      "id": "956c5836-e6a0-4184-9591-6722aa058d0a",
+      "name": "Draft Reply",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "lrMYcyYCdAHKrL5Q",
+          "name": "Gemini API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "75a5e4a2-c5a9-4916-a127-40fb3fba3c0b",
+              "leftValue": "={{ $json.candidates }}",
+              "rightValue": "",
+              "operator": {
+                "type": "array",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1568,
+        -288
+      ],
+      "id": "750b3391-ca1c-4e9a-9d82-030d08827146",
+      "name": "Check reply succeeded"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"status\": \"error\", \"message\": \"Reply drafting failed\" } }}",
+        "options": {
+          "responseCode": 502
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1792,
+        -192
+      ],
+      "id": "262ba5f1-97c4-4abe-aac1-98c814b5894f",
+      "name": "Respond to Webhook3"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a4fae46f-e070-4012-9a3f-5976b5691d9c",
+              "name": "timestamp",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            },
+            {
+              "id": "63064c05-d339-4d74-be41-6f2fc1ae5ec2",
+              "name": "name",
+              "value": "={{ $('Validate input').first().json.name }}",
+              "type": "string"
+            },
+            {
+              "id": "f8ea3fbb-4e93-49b1-9284-e5c9c9544ef0",
+              "name": "email",
+              "value": "={{ $('Validate input').first().json.email }}",
+              "type": "string"
+            },
+            {
+              "id": "14bc6484-d91a-4853-b0cf-b9f59da7a5b4",
+              "name": "message",
+              "value": "={{ $('Validate input').first().json.message }}",
+              "type": "string"
+            },
+            {
+              "id": "3642d49e-7496-4fb2-9af1-85de23f552ea",
+              "name": "score",
+              "value": "={{ $('Check classification succeeded + parse').item.json.score }}",
+              "type": "string"
+            },
+            {
+              "id": "702e4a58-e465-43d8-b324-070e3e4c8696",
+              "name": "reasoning",
+              "value": "={{ $('Check classification succeeded + parse').item.json.reasoning }}",
+              "type": "string"
+            },
+            {
+              "id": "7d1a7d0b-febf-43ab-b91b-e91b7220faa8",
+              "name": "draftReply",
+              "value": "={{ $json.candidates[0]?.content?.parts?.[0]?.text }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1792,
+        -384
+      ],
+      "id": "90e813f9-85e6-4072-b4e9-2a962f85bd84",
+      "name": "Merge fields for logging"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1UgPKl9N8Zrj5TjPuP6OImb4bv78G9Lmm_kYxKfp9DLo",
+          "mode": "list",
+          "cachedResultName": "Lead Triage",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1UgPKl9N8Zrj5TjPuP6OImb4bv78G9Lmm_kYxKfp9DLo/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Leads",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1UgPKl9N8Zrj5TjPuP6OImb4bv78G9Lmm_kYxKfp9DLo/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Timestamp": "={{ $json.timestamp }}",
+            "Name": "={{ $json.name }}",
+            "Email": "={{ $json.email }}",
+            "Message": "={{ $json.message }}",
+            "Score": "={{ $json.score }}",
+            "Reasoning": "={{ $json.reasoning }}",
+            "Draft Reply": "={{ $json.draftReply }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Message",
+              "displayName": "Message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Score",
+              "displayName": "Score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Reasoning",
+              "displayName": "Reasoning",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Draft Reply",
+              "displayName": "Draft Reply",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2016,
+        -384
+      ],
+      "id": "c9736cd9-eed5-4a97-af66-5d9b875fb860",
+      "name": "Log to Google Sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "KLFW9Fms4bzqMeW5",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "4d6e2c27-7590-4e4c-96fc-87503abadb50",
+              "leftValue": "={{ $('Merge fields for logging').item.json.score }}",
+              "rightValue": "Hot",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2240,
+        -384
+      ],
+      "id": "858c202d-4616-4aea-881a-4e45c04476b6",
+      "name": "Route on Hot"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.Email }}",
+        "subject": "={{ '\ud83d\udd25 Hot lead: ' + $json.Name }}",
+        "emailType": "text",
+        "message": "=New Hot lead \u2014 follow up ASAP.\n\nName: {{ $json.Name }}\nEmail: {{ $json.Email }}\n\nMessage:\n{{ $json.Message }}\n\nWhy it scored Hot: {{ $json.Reasoning }}\n\nDraft reply (already logged to the sheet, review before sending):\n{{ $json['Draft Reply'] }}",
+        "options": {
+          "appendAttribution": true
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2464,
+        -464
+      ],
+      "id": "a75039be-7f45-4ada-a46c-c993122783a0",
+      "name": "Hot lead alert",
+      "webhookId": "371327e9-b833-417d-97c3-153318b8eb86",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "3dVF31KwMvQyEQrS",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{\n  {\n    \"status\": \"success\",\n    \"score\": $json.score,\n    \"loggedAt\": $json.timestamp\n  }\n}}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        2688,
+        -384
+      ],
+      "id": "1875b53d-ef24-4822-8155-94a777175774",
+      "name": "Respond to Webhook4"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Trigger": {
+      "main": [
+        [
+          {
+            "node": "Validate input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate input": {
+      "main": [
+        [
+          {
+            "node": "Route on validity",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route on validity": {
+      "main": [
+        [
+          {
+            "node": "Classify Lead",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Webhook1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Lead": {
+      "main": [
+        [
+          {
+            "node": "Check classification succeeded + parse",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Webhook1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check classification succeeded + parse": {
+      "main": [
+        [
+          {
+            "node": "Draft Reply",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Webhook2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Draft Reply": {
+      "main": [
+        [
+          {
+            "node": "Check reply succeeded",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check reply succeeded": {
+      "main": [
+        [
+          {
+            "node": "Merge fields for logging",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Webhook3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge fields for logging": {
+      "main": [
+        [
+          {
+            "node": "Log to Google Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log to Google Sheet": {
+      "main": [
+        [
+          {
+            "node": "Route on Hot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route on Hot": {
+      "main": [
+        [
+          {
+            "node": "Hot lead alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Webhook4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hot lead alert": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "d7d6025a-1f06-4e48-a061-0bb04621e463",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "a2f303ca0d2af5b9ad43ebe3c5096b7aea7fa4f9d47d4153b2a346300f353e46"
+  },
+  "nodeGroups": [],
+  "id": "2hf80zj23YEw48rs",
+  "tags": []
+}

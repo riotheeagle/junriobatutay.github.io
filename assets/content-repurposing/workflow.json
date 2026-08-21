@@ -1,0 +1,874 @@
+{
+  "name": "AI Content Repurposing Pipeline",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Input",
+        "height": 596,
+        "width": 760,
+        "color": 5
+      },
+      "id": "sticky-input",
+      "name": "Sticky Input",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -48,
+        -64
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Process",
+        "height": 600,
+        "width": 916,
+        "color": 4
+      },
+      "id": "sticky-process",
+      "name": "Sticky Process",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        784,
+        -64
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Output",
+        "height": 600,
+        "width": 600,
+        "color": 6
+      },
+      "id": "sticky-output",
+      "name": "Sticky Output",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1856,
+        -64
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Error Handling",
+        "height": 488,
+        "width": 1616,
+        "color": 3
+      },
+      "id": "sticky-error",
+      "name": "Sticky Error Handling",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -48,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "347fee6d-9cf4-42e2-93cd-fe1d83d5f756",
+              "name": "transcript",
+              "value": "={{ $json['Transcript'].trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "b3f6ba6e-a168-40b2-8818-2ec3da8de617",
+              "name": "sourceTitle",
+              "value": "={{ $json['Source Title'] || 'Untitled Content' }}",
+              "type": "string"
+            },
+            {
+              "id": "cee2ee13-e2cd-4576-a774-3ff22b7e5384",
+              "name": "sourceUrl",
+              "value": "={{ $json['Source URL'] || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "3f23e5bd-c922-4a2e-993d-9fed01c2d9d0",
+              "name": "transcriptLength",
+              "value": "={{ $json['Transcript'].trim().length }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "8d406a11-bf91-4ac1-90fb-9fe6150a6a35",
+      "name": "Normalize input",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        288,
+        48
+      ]
+    },
+    {
+      "parameters": {
+        "formTitle": "Content Repurposer",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Transcript",
+              "fieldType": "textarea",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Source Title"
+            },
+            {
+              "fieldLabel": "Source URL"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e9c861e3-5f57-47e9-aed3-819f3cb0fa0c",
+      "name": "Form Trigger",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [
+        48,
+        48
+      ],
+      "webhookId": "01406afd-f9a4-4488-b770-89adc7964493"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "c5d8de19-3fa3-4d77-ba11-59cac239a475",
+              "leftValue": "={{ $json.transcriptLength }}",
+              "rightValue": 200,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a63376a4-be62-43a9-8fdc-e357d4d7fa6a",
+      "name": "Validate transcript",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        528,
+        48
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googlePalmApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  {\n    \"contents\": [\n      {\n        \"role\": \"user\",\n        \"parts\": [\n          {\n            \"text\": \"You are a skilled content writer who turns raw transcripts into engaging blog posts.\\n\\nWrite a blog post of approximately 600 words based on the transcript below. Requirements:\\n- Clear, engaging, conversational tone (not corporate, not academic)\\n- Open with a hook — a question, a surprising claim, or a scene, not \\\"In this post we will discuss...\\\"\\n- Use 3-5 short subheadings to break up the content\\n- Close with a short takeaway or call-to-action, not a generic summary\\n- Do not mention that this was generated from a transcript or podcast\\n- Output ONLY the blog post itself — no preamble like \\\"Here is your blog post\\\", no meta-commentary, no markdown title, just the body content with subheadings\\n\\nTranscript:\\n\" + $('Normalize input').item.json.transcript\n          }\n        ]\n      }\n    ],\n    \"generationConfig\": {\n      \"maxOutputTokens\": 8192,\n      \"temperature\": 0.7\n    }\n  }\n}}",
+        "options": {}
+      },
+      "id": "8ae2afe6-38eb-485d-835d-1d50b0b572ba",
+      "name": "Generate Blog Post",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        880,
+        48
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "googlePalmApi": {
+          "id": "VRF0WAD1Wc4lfuxr",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "bb934a59-21bd-4d3d-9b54-f4473bd0aa42",
+              "leftValue": "={{ $json.candidates }}",
+              "rightValue": "",
+              "operator": {
+                "type": "array",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "f551b5e4-a5be-4c9d-a05b-d36ea30be9fd",
+      "name": "Check Blog Post succeeded",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1088,
+        48
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  {\n    \"contents\": [\n      {\n        \"role\": \"user\",\n        \"parts\": [\n          {\n            \"text\": \"You are a social media copywriter who writes tweet threads that people actually stop scrolling for.\\n\\nWrite a 5-tweet thread summarizing the key points of the transcript below. Requirements:\\n- Tweet 1 is a hook — a bold claim, a surprising stat, or a question. It must work as a standalone tweet that makes someone want to read on.\\n- Tweets 2-4 each cover one distinct key point, insight, or takeaway from the content. One idea per tweet.\\n- Tweet 5 closes with a takeaway, a question to the reader, or a light call-to-action (not \\\"link in bio\\\" — just a natural close)\\n- Each tweet must be under 280 characters\\n- No hashtags unless genuinely essential to the point\\n- Do NOT number the tweets with '1/5' style — just write them as clean standalone lines\\n\\nOutput format: Return ONLY valid JSON in this exact structure:\\n{\\\"tweets\\\": [\\\"tweet 1 text\\\", \\\"tweet 2 text\\\", \\\"tweet 3 text\\\", \\\"tweet 4 text\\\", \\\"tweet 5 text\\\"]}\\n\\nTranscript:\\n\" + $('Normalize input').item.json.transcript\n          }\n        ]\n      }\n    ],\n    \"generationConfig\": {\n      \"responseMimeType\": \"application/json\",\n      \"maxOutputTokens\": 8192,\n      \"temperature\": 0.5\n    }\n  }\n}}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "4682d574-6a06-45bf-a52f-822668e93921",
+      "name": "Generate Tweet Thread",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1504,
+        48
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "googlePalmApi": {
+          "id": "VRF0WAD1Wc4lfuxr",
+          "name": "Google Gemini(PaLM) Api account"
+        },
+        "httpHeaderAuth": {
+          "id": "AjKhF4W18JDHlCgn",
+          "name": "Gemini"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.all()[0].json;\nconst rawText = item.candidates?.[0]?.content?.parts?.[0]?.text;\n\nif (!rawText) {\n  throw new Error(\"Error: Gemini returned empty content.\");\n}\n\n// 1. Clean the markdown fences\nlet cleanText = rawText.replace(/```json/g, \"\");\ncleanText = cleanText.replace(/```/g, \"\");\ncleanText = cleanText.trim();\n\n// 2. Try to parse\ntry {\n  const parsed = JSON.parse(cleanText);\n  \n  if (!parsed.tweets) {\n     throw new Error(\"JSON parsed, but missing 'tweets' array.\");\n  }\n  \n  return [{ json: { tweets: parsed.tweets } }];\n  \n} catch (error) {\n  // 3. We DO NOT put the cleanText in the Error message. \n  // We log it to the console so you can read it safely, \n  // and throw a completely static string so n8n doesn't crash.\n  \n  console.log(\"=== WHAT GEMINI ACTUALLY WROTE ===\");\n  console.log(rawText);\n  console.log(\"==================================\");\n  \n  throw new Error(\"JSON Parse Failed! The text Gemini returned is not valid JSON. Check the n8n Execution Log for Node 6 output, or check the browser console to see the raw text.\");\n}"
+      },
+      "id": "78aae2ab-160d-4804-bc61-09f4ad258728",
+      "name": "Check Thread succeeded + parse",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        288
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  {\n    \"contents\": [\n      {\n        \"role\": \"user\",\n        \"parts\": [\n          {\n            \"text\": \"You are a professional writing a LinkedIn post to share an insight from content you consumed.\\n\\nWrite a single LinkedIn post, 150-200 words, based on the transcript below. Requirements:\\n- Professional tone, but written like a real person shares an opinion, not corporate-speak\\n- Open with a strong first line that stands alone (LinkedIn truncates posts, so the first line must earn the click to 'see more')\\n- Focus on ONE key insight or takeaway rather than trying to summarize everything\\n- Include a short personal-sounding reflection or implication of the insight, not just a restatement of facts\\n- End with a light question or discussion prompt to encourage comments\\n- No hashtags, no emojis, no bullet-point lists\\n- Output ONLY the post text — no preamble, no title, no word count note\\n\\nTranscript:\\n\" + $('Normalize input').item.json.transcript\n          }\n        ]\n      }\n    ],\n    \"generationConfig\": {\n      \"maxOutputTokens\": 8192,\n      \"temperature\": 0.7\n    }\n  }\n}}",
+        "options": {}
+      },
+      "id": "2424da21-d6ec-4749-a2ba-7ef10cc1118e",
+      "name": "Generate LinkedIn Post",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1312,
+        288
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "googlePalmApi": {
+          "id": "VRF0WAD1Wc4lfuxr",
+          "name": "Google Gemini(PaLM) Api account"
+        },
+        "httpHeaderAuth": {
+          "id": "AjKhF4W18JDHlCgn",
+          "name": "Gemini"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "bb934a59-21bd-4d3d-9b54-f4473bd0aa42",
+              "leftValue": "={{ $json.candidates }}",
+              "rightValue": "",
+              "operator": {
+                "type": "array",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "f1cdee85-03c7-4bd1-8419-838ffa8ede79",
+      "name": "Check LinkedIn succeeded",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1504,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "6d10af55-5163-4d78-a2fa-08fc471ae47e",
+              "name": "blogPost",
+              "value": "={{ $('Generate Blog Post').item.json.candidates[0].content.parts[0].text }}",
+              "type": "string"
+            },
+            {
+              "id": "a0d37739-5626-4c64-afb1-1cde1835f1a3",
+              "name": "tweetThread",
+              "value": "={{ $('Check Thread succeeded + parse').item.json.tweets.map((t, i) => (i+1) + '. ' + t).join('\\n\\n') }}",
+              "type": "string"
+            },
+            {
+              "id": "d5120600-5b8d-421f-af07-f0196b1db067",
+              "name": "linkedinPost",
+              "value": "={{ $('Generate LinkedIn Post').item.json.candidates[0].content.parts[0].text }}",
+              "type": "string"
+            },
+            {
+              "id": "73c5c5c0-5dc2-43d9-ac18-669b4cb9ab8e",
+              "name": "docTitle",
+              "value": "={{ $('Normalize input').item.json.sourceTitle }} — Repurposed Content — {{ $now.format('yyyy-MM-dd') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "191bd290-57d7-4e66-abad-75a96fbe78bb",
+      "name": "Merge all three outputs",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1968,
+        48
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "8931262795",
+        "text": "Transcript too short or empty",
+        "additionalFields": {}
+      },
+      "id": "0231ca17-d368-4f5c-87b4-f9b9a3c04301",
+      "name": "Telegram Error Notify",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        48,
+        736
+      ],
+      "webhookId": "20266129-4cb3-490e-9452-e7ade00c0d06",
+      "credentials": {
+        "telegramApi": {
+          "id": "7iTv0s1x7hSOuTHC",
+          "name": "Client OS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "1432176593",
+        "text": "Blog post generation error",
+        "additionalFields": {
+          "appendAttribution": true
+        }
+      },
+      "id": "4e50f28d-ca05-40a6-89f2-19087aa8c536",
+      "name": "HTTP Request Error",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        448,
+        736
+      ],
+      "webhookId": "6d2f944c-5cb4-44f6-bb68-fcf1493b947d",
+      "credentials": {
+        "telegramApi": {
+          "id": "7iTv0s1x7hSOuTHC",
+          "name": "Client OS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "1432176593",
+        "text": "Blog post generation returned empty candidates",
+        "additionalFields": {}
+      },
+      "id": "de4f6b6b-e60d-436f-bef7-96f3d41e00ff",
+      "name": "Telegram Error Notify - 2",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        848,
+        736
+      ],
+      "webhookId": "20266129-4cb3-490e-9452-e7ade00c0d06",
+      "credentials": {
+        "telegramApi": {
+          "id": "7iTv0s1x7hSOuTHC",
+          "name": "Client OS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "1432176593",
+        "text": "Tweet thread generation error",
+        "additionalFields": {}
+      },
+      "id": "3007e662-00e5-4179-bc97-d93ce1f1bb8f",
+      "name": "HTTP Request Error - 2",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1248,
+        736
+      ],
+      "webhookId": "6d2f944c-5cb4-44f6-bb68-fcf1493b947d",
+      "credentials": {
+        "telegramApi": {
+          "id": "7iTv0s1x7hSOuTHC",
+          "name": "Client OS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "1432176593",
+        "text": "Parsing failed",
+        "additionalFields": {}
+      },
+      "id": "29781d29-98c2-4c5f-8b58-8419ca5909d6",
+      "name": "Telegram Error Notify - 3",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        48,
+        896
+      ],
+      "webhookId": "20266129-4cb3-490e-9452-e7ade00c0d06",
+      "credentials": {
+        "telegramApi": {
+          "id": "7iTv0s1x7hSOuTHC",
+          "name": "Client OS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "1432176593",
+        "text": "Linkedin post generation error",
+        "additionalFields": {}
+      },
+      "id": "208ac70e-01b8-496c-9f42-7f112358d9de",
+      "name": "HTTP Request Error - 3",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        448,
+        896
+      ],
+      "webhookId": "6d2f944c-5cb4-44f6-bb68-fcf1493b947d",
+      "credentials": {
+        "telegramApi": {
+          "id": "7iTv0s1x7hSOuTHC",
+          "name": "Client OS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "1432176593",
+        "text": "Linkedin post generation returned empty candidates",
+        "additionalFields": {}
+      },
+      "id": "fcc609fa-5b8e-4c62-859f-f737707d8c84",
+      "name": "Telegram Error Notify - 4",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        848,
+        896
+      ],
+      "webhookId": "20266129-4cb3-490e-9452-e7ade00c0d06",
+      "credentials": {
+        "telegramApi": {
+          "id": "7iTv0s1x7hSOuTHC",
+          "name": "Client OS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "1432176593",
+        "text": "=✅ Content repurposed!\n\nTitle: {{ $('Normalize input').item.json.sourceTitle || 'Untitled Content' }}\n\nDoc: https://docs.google.com/document/d/{{ $json.documentId }}/edit",
+        "additionalFields": {}
+      },
+      "id": "c8e08fad-f3c5-4d5e-a4fb-2da1b5c0786b",
+      "name": "Success Update",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2208,
+        288
+      ],
+      "webhookId": "b33582c7-08bc-4647-bb90-4eb767b2763a",
+      "credentials": {
+        "telegramApi": {
+          "id": "7iTv0s1x7hSOuTHC",
+          "name": "Client OS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentURL": "={{ $json.id }}",
+        "actionsUi": {
+          "actionFields": [
+            {
+              "action": "insert",
+              "locationChoice": "location",
+              "text": "=BLOG POST\n{{ $('Merge all three outputs').item.json.blogPost }}\n\nTWEET THREAD\n{{ $('Merge all three outputs').item.json.tweetThread }}\n\nLINKEDIN POST \n{{ $('Merge all three outputs').item.json.linkedinPost }}\n\nSource: {{ $('Normalize input').item.json.sourceUrl }}"
+            }
+          ]
+        }
+      },
+      "id": "3667af74-2c0a-4367-b0e8-1f85893a72eb",
+      "name": "Add Doc Body",
+      "type": "n8n-nodes-base.googleDocs",
+      "typeVersion": 2,
+      "position": [
+        1968,
+        288
+      ],
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "LaTYbGd3aVdjBwqZ",
+          "name": "Google Docs account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "folderId": "default",
+        "title": "={{ $json.docTitle }}"
+      },
+      "id": "45d8b7ec-53c6-4397-9bc4-0a562196dd53",
+      "name": "Create Google Doc",
+      "type": "n8n-nodes-base.googleDocs",
+      "typeVersion": 2,
+      "position": [
+        2208,
+        48
+      ],
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "LaTYbGd3aVdjBwqZ",
+          "name": "Google Docs account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 60
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1312,
+        48
+      ],
+      "id": "a738cfb0-5aa1-47c8-a5fa-de022c1e37e5",
+      "name": "Pause",
+      "webhookId": "dba01aa2-9375-4d8e-82a4-cfd139522760"
+    },
+    {
+      "parameters": {
+        "amount": 60
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1088,
+        288
+      ],
+      "id": "2b2d124c-4142-4463-bd62-b4f926268ebc",
+      "name": "Pause (2)",
+      "webhookId": "dbb384c9-f530-40a9-8dab-179c14bc288f"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Form Trigger": {
+      "main": [
+        [
+          {
+            "node": "Normalize input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize input": {
+      "main": [
+        [
+          {
+            "node": "Validate transcript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate transcript": {
+      "main": [
+        [
+          {
+            "node": "Generate Blog Post",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram Error Notify",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Blog Post": {
+      "main": [
+        [
+          {
+            "node": "Check Blog Post succeeded",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP Request Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Blog Post succeeded": {
+      "main": [
+        [
+          {
+            "node": "Pause",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram Error Notify - 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Tweet Thread": {
+      "main": [
+        [
+          {
+            "node": "Check Thread succeeded + parse",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP Request Error - 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Thread succeeded + parse": {
+      "main": [
+        [
+          {
+            "node": "Pause (2)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram Error Notify - 3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate LinkedIn Post": {
+      "main": [
+        [
+          {
+            "node": "Check LinkedIn succeeded",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP Request Error - 3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check LinkedIn succeeded": {
+      "main": [
+        [
+          {
+            "node": "Merge all three outputs",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram Error Notify - 4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge all three outputs": {
+      "main": [
+        [
+          {
+            "node": "Create Google Doc",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Success Update": {
+      "main": [
+        []
+      ]
+    },
+    "Add Doc Body": {
+      "main": [
+        [
+          {
+            "node": "Success Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Google Doc": {
+      "main": [
+        [
+          {
+            "node": "Add Doc Body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pause": {
+      "main": [
+        [
+          {
+            "node": "Generate Tweet Thread",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pause (2)": {
+      "main": [
+        [
+          {
+            "node": "Generate LinkedIn Post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "79d88b80-a132-4d04-8922-de9f8950d80e",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "a2f303ca0d2af5b9ad43ebe3c5096b7aea7fa4f9d47d4153b2a346300f353e46"
+  },
+  "nodeGroups": [],
+  "id": "UP79LUniPBzpPtsV",
+  "tags": []
+}

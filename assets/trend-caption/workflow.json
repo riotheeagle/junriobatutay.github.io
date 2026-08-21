@@ -1,0 +1,1216 @@
+{
+  "name": "Daily Trend-to-Caption Queue",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ],
+      "id": "09739882-44ee-4271-99e4-1679d0723651",
+      "name": "Trigger"
+    },
+    {
+      "parameters": {
+        "url": "=https://hn.algolia.com/api/v1/search_by_date?query=AI&tags=story&numericFilters=points%3E20,created_at_i%3E{{ Math.floor(Date.now()/1000) - 86400 }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        224,
+        0
+      ],
+      "id": "9578d94f-0af3-4d1b-ab96-418d6a79b596",
+      "name": "Pull Trending Topics"
+    },
+    {
+      "parameters": {
+        "jsCode": "const posts = $json.hits || [];\n\nif (posts.length === 0) {\n  return [{ hasResults: false, topics: [] }];\n}\n\nconst wordBoundaryAI = /\\bAI\\b/i;\n\nconst ranked = posts\n  .filter(p => wordBoundaryAI.test(p.title))\n  .map(p => ({\n    title: p.title,\n    score: p.points,\n    permalink: 'https://news.ycombinator.com/item?id=' + p.objectID\n  }))\n  .sort((a, b) => b.score - a.score)\n  .slice(0, 3);\n\nreturn [{ hasResults: ranked.length > 0, topics: ranked }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ],
+      "id": "09b98a96-9d8a-4aba-a6cd-a7b21538d861",
+      "name": "Parse and Rank Topics"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "0dd05db0-e93b-4d85-9574-eebe0a0e1653",
+              "leftValue": "={{ $json.hasResults }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        672,
+        0
+      ],
+      "id": "2aca5dfb-ec19-42b8-91f9-15adfb0612e6",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "chatId": "1432176593",
+        "text": "⚠️ Trend workflow found zero results today — check the Reddit source or try again manually.",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        192,
+        256
+      ],
+      "id": "345aea6a-224f-4445-90d6-e777108f044b",
+      "name": "Zero Results",
+      "webhookId": "697d41f4-5bf4-45dc-84e0-bc3cf27a4a36",
+      "credentials": {
+        "telegramApi": {
+          "id": "7iTv0s1x7hSOuTHC",
+          "name": "Client OS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.requestBody }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1232,
+        -96
+      ],
+      "id": "043f80a1-2449-4c11-b24d-6ec6bd8f93f5",
+      "name": "Generate Captions",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "AjKhF4W18JDHlCgn",
+          "name": "Gemini"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const topic = $json.title;\nconst permalink = $json.permalink;\n\nconst promptText = `You are a social media copywriter for an AI tools and automation brand. Turn the trending topic below into ready-to-post captions.\n\nTopic: ${topic}\n\nWrite two captions:\n\n1. TWITTER/X: under 280 characters, punchy and direct, no engagement-bait clichés (\"You won't believe...\", \"Thread below\"), 0-2 relevant hashtags maximum only if genuinely fitting.\n\n2. LINKEDIN: 80-150 words, professional but not corporate-stiff, written like a practitioner sharing a real observation, ends with a light question or discussion prompt, no hashtags, no emojis.\n\nFor EACH caption, also write a matching image generation prompt: a concrete visual description (subject, style, mood, composition) suitable for an AI image generator, under 40 words, no text-in-image requests.\n\nOutput ONLY valid JSON, no markdown fences, no preamble, in this exact structure:\n{\"twitter\": {\"caption\": \"...\", \"imagePrompt\": \"...\"}, \"linkedin\": {\"caption\": \"...\", \"imagePrompt\": \"...\"}}`;\n\nreturn {\n  json: {\n    topic: topic,\n    permalink: permalink,\n    requestBody: {\n      contents: [\n        { role: \"user\", parts: [ { text: promptText } ] }\n      ],\n      generationConfig: {\n        responseMimeType: \"application/json\",\n        maxOutputTokens: 2000,\n        temperature: 0.7\n      }\n    }\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        -96
+      ],
+      "id": "89e8ba62-2e98-405e-abe0-e9938d88b20c",
+      "name": "Build Caption Request"
+    },
+    {
+      "parameters": {
+        "jsCode": "const responseItems = $input.all();\nconst requestItems = $('Build Caption Request').all();\nconst output = [];\n\nfor (let i = 0; i < responseItems.length; i++) {\n  const raw = responseItems[i].json.candidates?.[0]?.content?.parts?.[0]?.text;\n  const topic = requestItems[i].json.topic;\n  const sourceUrl = requestItems[i].json.permalink;\n\n  if (!raw) {\n    throw new Error('Caption generation returned no content for topic: ' + topic);\n  }\n\n  const cleaned = raw.replace(/```json|```/g, '').trim();\n\n  let parsed;\n  try {\n    parsed = JSON.parse(cleaned);\n  } catch (e) {\n    throw new Error('Caption response was not valid JSON: ' + cleaned.slice(0, 200));\n  }\n\n  if (!parsed.twitter?.caption || !parsed.linkedin?.caption) {\n    throw new Error('Caption response was missing required fields');\n  }\n\n  const now = new Date().toISOString();\n\n  output.push({\n    json: {\n      dateAdded: now,\n      topic: topic,\n      platform: 'Twitter',\n      caption: parsed.twitter.caption,\n      imagePrompt: parsed.twitter.imagePrompt,\n      status: 'Draft',\n      sourceUrl: sourceUrl\n    }\n  });\n\n  output.push({\n    json: {\n      dateAdded: now,\n      topic: topic,\n      platform: 'LinkedIn',\n      caption: parsed.linkedin.caption,\n      imagePrompt: parsed.linkedin.imagePrompt,\n      status: 'Draft',\n      sourceUrl: sourceUrl\n    }\n  });\n}\n\nreturn output;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1408,
+        -96
+      ],
+      "id": "4d3681c5-cd33-4ebc-bf5c-eb28aa8bc9de",
+      "name": "Parse and Reshape Captions"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "topics",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        864,
+        -80
+      ],
+      "id": "51a543d5-e528-4b8e-8a11-a79e84d826da",
+      "name": "Split Into Individual Topics"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1HQvrf_k-V860520HYT1iYU1uTP5lR1xugfZziMIFOhE",
+          "mode": "list",
+          "cachedResultName": "Daily Trend-to-Caption Queue",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1HQvrf_k-V860520HYT1iYU1uTP5lR1xugfZziMIFOhE/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Queue",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1HQvrf_k-V860520HYT1iYU1uTP5lR1xugfZziMIFOhE/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Date Added": "={{ $json.dateAdded }}",
+            "Topic ": "={{ $json.topic }}",
+            "Platform": "={{ $json.platform }}",
+            "Caption": "={{ $json.caption }}",
+            "Image Prompt": "={{ $json.imagePrompt }}",
+            "Status": "={{ $json.status }}",
+            "Source URL": "={{ $json.sourceUrl }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Date Added",
+              "displayName": "Date Added",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Topic ",
+              "displayName": "Topic ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Platform",
+              "displayName": "Platform",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Caption",
+              "displayName": "Caption",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Image Prompt",
+              "displayName": "Image Prompt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Source URL",
+              "displayName": "Source URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1632,
+        -96
+      ],
+      "id": "1ea3ae31-a4ff-46ae-ae32-b2b9a3b366ba",
+      "name": "Log to Google Sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "KLFW9Fms4bzqMeW5",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {
+    "Trigger": [
+      {
+        "json": {
+          "timestamp": "2026-08-19T19:03:40.291+08:00",
+          "Readable date": "August 19th 2026, 7:03:40 pm",
+          "Readable time": "7:03:40 pm",
+          "Day of week": "Wednesday",
+          "Year": "2026",
+          "Month": "August",
+          "Day of month": "19",
+          "Hour": "19",
+          "Minute": "03",
+          "Second": "40",
+          "Timezone": "Asia/Shanghai (UTC+08:00)"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ],
+    "Pull Trending Topics": [
+      {
+        "json": {
+          "exhaustive": {
+            "nbHits": true,
+            "typo": true
+          },
+          "exhaustiveNbHits": true,
+          "exhaustiveTypo": true,
+          "hits": [
+            {
+              "_highlightResult": {
+                "author": {
+                  "matchLevel": "none",
+                  "matchedWords": [],
+                  "value": "gurov"
+                },
+                "title": {
+                  "fullyHighlighted": false,
+                  "matchLevel": "full",
+                  "matchedWords": [
+                    "ai"
+                  ],
+                  "value": "<em>Ai</em>r Theremin – a browser theremin you play by waving at your webcam"
+                },
+                "url": {
+                  "matchLevel": "none",
+                  "matchedWords": [],
+                  "value": "https://theremin.bizibah.com/"
+                }
+              },
+              "_tags": [
+                "story",
+                "author_gurov",
+                "story_49359425",
+                "front_page"
+              ],
+              "author": "gurov",
+              "children": [
+                49359983,
+                49359992,
+                49359959,
+                49359851,
+                49359903,
+                49359704,
+                49359440
+              ],
+              "created_at": "2026-08-19T10:15:00Z",
+              "created_at_i": 1787134500,
+              "num_comments": 10,
+              "objectID": "49359425",
+              "points": 29,
+              "story_id": 49359425,
+              "title": "Air Theremin – a browser theremin you play by waving at your webcam",
+              "updated_at": "2026-08-19T11:25:53Z",
+              "url": "https://theremin.bizibah.com/"
+            },
+            {
+              "_highlightResult": {
+                "author": {
+                  "matchLevel": "none",
+                  "matchedWords": [],
+                  "value": "sunils34"
+                },
+                "title": {
+                  "matchLevel": "none",
+                  "matchedWords": [],
+                  "value": "Cerebras CS-4"
+                },
+                "url": {
+                  "fullyHighlighted": false,
+                  "matchLevel": "full",
+                  "matchedWords": [
+                    "ai"
+                  ],
+                  "value": "https://www.cerebras.<em>ai</em>/cs4"
+                }
+              },
+              "_tags": [
+                "story",
+                "author_sunils34",
+                "story_49354949",
+                "front_page"
+              ],
+              "author": "sunils34",
+              "children": [
+                49358714,
+                49359725,
+                49355495,
+                49355619,
+                49359288,
+                49355653,
+                49355767,
+                49355924,
+                49355445,
+                49355382,
+                49356523,
+                49356589,
+                49355694,
+                49355943,
+                49358320,
+                49357612,
+                49355472,
+                49356559,
+                49355689,
+                49355457,
+                49356911,
+                49355528
+              ],
+              "created_at": "2026-08-19T00:28:18Z",
+              "created_at_i": 1787099298,
+              "num_comments": 205,
+              "objectID": "49354949",
+              "points": 306,
+              "story_id": 49354949,
+              "title": "Cerebras CS-4",
+              "updated_at": "2026-08-19T11:25:23Z",
+              "url": "https://www.cerebras.ai/cs4"
+            },
+            {
+              "_highlightResult": {
+                "author": {
+                  "matchLevel": "none",
+                  "matchedWords": [],
+                  "value": "giuliomagnifico"
+                },
+                "title": {
+                  "fullyHighlighted": false,
+                  "matchLevel": "full",
+                  "matchedWords": [
+                    "ai"
+                  ],
+                  "value": "<em>AI</em> usage patterns in software teams"
+                },
+                "url": {
+                  "matchLevel": "none",
+                  "matchedWords": [],
+                  "value": "https://linear.app/data"
+                }
+              },
+              "_tags": [
+                "story",
+                "author_giuliomagnifico",
+                "story_49353432",
+                "front_page"
+              ],
+              "author": "giuliomagnifico",
+              "children": [
+                49359403,
+                49355413,
+                49358440,
+                49356391,
+                49357527,
+                49354577,
+                49357782,
+                49357840,
+                49356196,
+                49354780,
+                49355858,
+                49354715,
+                49357722,
+                49357420,
+                49356501,
+                49356544,
+                49354626,
+                49355249,
+                49356540
+              ],
+              "created_at": "2026-08-18T22:08:07Z",
+              "created_at_i": 1787090887,
+              "num_comments": 97,
+              "objectID": "49353432",
+              "points": 148,
+              "story_id": 49353432,
+              "title": "AI usage patterns in software teams",
+              "updated_at": "2026-08-19T11:25:53Z",
+              "url": "https://linear.app/data"
+            },
+            {
+              "_highlightResult": {
+                "author": {
+                  "matchLevel": "none",
+                  "matchedWords": [],
+                  "value": "apitman"
+                },
+                "title": {
+                  "matchLevel": "none",
+                  "matchedWords": [],
+                  "value": "GLM-5.3 Artificial Analysis Benchmarks"
+                },
+                "url": {
+                  "fullyHighlighted": false,
+                  "matchLevel": "full",
+                  "matchedWords": [
+                    "ai"
+                  ],
+                  "value": "https://artificialanalysis.<em>ai</em>/models/glm-5-3"
+                }
+              },
+              "_tags": [
+                "story",
+                "author_apitman",
+                "story_49353407"
+              ],
+              "author": "apitman",
+              "children": [
+                49354276,
+                49354638,
+                49359143,
+                49355569,
+                49354288,
+                49356853,
+                49355571,
+                49356069,
+                49354143,
+                49354237,
+                49354309,
+                49355505,
+                49353995,
+                49356511,
+                49354622
+              ],
+              "created_at": "2026-08-18T22:06:10Z",
+              "created_at_i": 1787090770,
+              "num_comments": 50,
+              "objectID": "49353407",
+              "points": 129,
+              "story_id": 49353407,
+              "title": "GLM-5.3 Artificial Analysis Benchmarks",
+              "updated_at": "2026-08-19T11:00:39Z",
+              "url": "https://artificialanalysis.ai/models/glm-5-3"
+            },
+            {
+              "_highlightResult": {
+                "author": {
+                  "matchLevel": "none",
+                  "matchedWords": [],
+                  "value": "cwwc"
+                },
+                "title": {
+                  "fullyHighlighted": false,
+                  "matchLevel": "full",
+                  "matchedWords": [
+                    "ai"
+                  ],
+                  "value": "Field measurements of neighborhood-scale <em>ai</em>r temperature impacts of data centers"
+                },
+                "url": {
+                  "matchLevel": "none",
+                  "matchedWords": [],
+                  "value": "https://asmedigitalcollection.asme.org/sustainablebuildings/article/7/2/024501/1233035/Data-Center-Waste-Heat-as-an-Emerging-Urban"
+                }
+              },
+              "_tags": [
+                "story",
+                "author_cwwc",
+                "story_49349147"
+              ],
+              "author": "cwwc",
+              "children": [
+                49350009,
+                49349757,
+                49351322,
+                49350132,
+                49349923,
+                49352154,
+                49352001,
+                49350678,
+                49355820,
+                49349988,
+                49354133,
+                49349669,
+                49350580,
+                49350002,
+                49349563,
+                49350636,
+                49352532,
+                49351928,
+                49353585,
+                49349753,
+                49353041,
+                49349743,
+                49352721,
+                49350111,
+                49351678,
+                49357694,
+                49351426,
+                49349858,
+                49349842,
+                49353508,
+                49349807,
+                49351276,
+                49352191
+              ],
+              "created_at": "2026-08-18T17:24:53Z",
+              "created_at_i": 1787073893,
+              "num_comments": 463,
+              "objectID": "49349147",
+              "points": 302,
+              "story_id": 49349147,
+              "title": "Field measurements of neighborhood-scale air temperature impacts of data centers",
+              "updated_at": "2026-08-19T11:25:23Z",
+              "url": "https://asmedigitalcollection.asme.org/sustainablebuildings/article/7/2/024501/1233035/Data-Center-Waste-Heat-as-an-Emerging-Urban"
+            },
+            {
+              "_highlightResult": {
+                "author": {
+                  "matchLevel": "none",
+                  "matchedWords": [],
+                  "value": "Macha"
+                },
+                "title": {
+                  "matchLevel": "none",
+                  "matchedWords": [],
+                  "value": "Why your Amazon order confirmation emails have become so unhelpful"
+                },
+                "url": {
+                  "fullyHighlighted": false,
+                  "matchLevel": "full",
+                  "matchedWords": [
+                    "ai"
+                  ],
+                  "value": "https://www.theverge.com/<em>ai</em>-artificial-intelligence/977733/amazon-order-emails-google-gmail-<em>ai</em>-agents-data"
+                }
+              },
+              "_tags": [
+                "story",
+                "author_Macha",
+                "story_49348627"
+              ],
+              "author": "Macha",
+              "children": [
+                49349971,
+                49349307,
+                49351703,
+                49355037,
+                49349749,
+                49350084,
+                49354315,
+                49353872,
+                49349347,
+                49350206,
+                49354961,
+                49349328,
+                49350100,
+                49350708,
+                49349526
+              ],
+              "created_at": "2026-08-18T16:54:42Z",
+              "created_at_i": 1787072082,
+              "num_comments": 30,
+              "objectID": "49348627",
+              "points": 68,
+              "story_id": 49348627,
+              "title": "Why your Amazon order confirmation emails have become so unhelpful",
+              "updated_at": "2026-08-19T09:47:40Z",
+              "url": "https://www.theverge.com/ai-artificial-intelligence/977733/amazon-order-emails-google-gmail-ai-agents-data"
+            },
+            {
+              "_highlightResult": {
+                "author": {
+                  "matchLevel": "none",
+                  "matchedWords": [],
+                  "value": "zug_zug"
+                },
+                "title": {
+                  "fullyHighlighted": false,
+                  "matchLevel": "full",
+                  "matchedWords": [
+                    "ai"
+                  ],
+                  "value": "<em>AI</em> won't solve the work-theater problem"
+                },
+                "url": {
+                  "matchLevel": "none",
+                  "matchedWords": [],
+                  "value": "https://think-twice.me/?p=102"
+                }
+              },
+              "_tags": [
+                "story",
+                "author_zug_zug",
+                "story_49347015"
+              ],
+              "author": "zug_zug",
+              "children": [
+                49358085,
+                49353573,
+                49353451,
+                49352733
+              ],
+              "created_at": "2026-08-18T15:21:29Z",
+              "created_at_i": 1787066489,
+              "num_comments": 5,
+              "objectID": "49347015",
+              "points": 33,
+              "story_id": 49347015,
+              "title": "AI won't solve the work-theater problem",
+              "updated_at": "2026-08-19T10:53:38Z",
+              "url": "https://think-twice.me/?p=102"
+            },
+            {
+              "_highlightResult": {
+                "author": {
+                  "matchLevel": "none",
+                  "matchedWords": [],
+                  "value": "mukundzha6"
+                },
+                "title": {
+                  "fullyHighlighted": false,
+                  "matchLevel": "full",
+                  "matchedWords": [
+                    "ai"
+                  ],
+                  "value": "Show HN: I canceled my <em>AI</em> code reviewer and wrote a free local one"
+                },
+                "url": {
+                  "matchLevel": "none",
+                  "matchedWords": [],
+                  "value": "https://github.com/mukundzha/avouch"
+                }
+              },
+              "_tags": [
+                "story",
+                "author_mukundzha6",
+                "story_49345154",
+                "show_hn"
+              ],
+              "author": "mukundzha6",
+              "children": [
+                49356094,
+                49346133,
+                49346220,
+                49345891,
+                49345648,
+                49345313,
+                49345614,
+                49345740,
+                49345777,
+                49346263
+              ],
+              "created_at": "2026-08-18T13:13:17Z",
+              "created_at_i": 1787058797,
+              "num_comments": 23,
+              "objectID": "49345154",
+              "points": 22,
+              "story_id": 49345154,
+              "title": "Show HN: I canceled my AI code reviewer and wrote a free local one",
+              "updated_at": "2026-08-19T08:58:52Z",
+              "url": "https://github.com/mukundzha/avouch"
+            }
+          ],
+          "hitsPerPage": 20,
+          "nbHits": 8,
+          "nbPages": 1,
+          "page": 0,
+          "params": "query=AI&tags=story&numericFilters=points%3E20%2Ccreated_at_i%3E1787052361&advancedSyntax=true&analyticsTags=backend",
+          "processingTimeMS": 1,
+          "processingTimingsMS": {
+            "_request": {
+              "roundTrip": 20
+            },
+            "total": 1
+          },
+          "query": "AI",
+          "serverTimeMS": 1
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ],
+    "Parse and Rank Topics": [
+      {
+        "json": {
+          "hasResults": true,
+          "topics": [
+            {
+              "title": "AI usage patterns in software teams",
+              "score": 148,
+              "permalink": "https://news.ycombinator.com/item?id=49353432"
+            },
+            {
+              "title": "AI won't solve the work-theater problem",
+              "score": 33,
+              "permalink": "https://news.ycombinator.com/item?id=49347015"
+            },
+            {
+              "title": "Show HN: I canceled my AI code reviewer and wrote a free local one",
+              "score": 22,
+              "permalink": "https://news.ycombinator.com/item?id=49345154"
+            }
+          ]
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ],
+    "Split Into Individual Topics": [
+      {
+        "json": {
+          "title": "AI usage patterns in software teams",
+          "score": 148,
+          "permalink": "https://news.ycombinator.com/item?id=49353432"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "title": "AI won't solve the work-theater problem",
+          "score": 33,
+          "permalink": "https://news.ycombinator.com/item?id=49347015"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "title": "Show HN: I canceled my AI code reviewer and wrote a free local one",
+          "score": 22,
+          "permalink": "https://news.ycombinator.com/item?id=49345154"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ],
+    "Build Caption Request": [
+      {
+        "json": {
+          "topic": "AI usage patterns in software teams",
+          "permalink": "https://news.ycombinator.com/item?id=49353432",
+          "requestBody": {
+            "contents": [
+              {
+                "role": "user",
+                "parts": [
+                  {
+                    "text": "You are a social media copywriter for an AI tools and automation brand. Turn the trending topic below into ready-to-post captions.\n\nTopic: AI usage patterns in software teams\n\nWrite two captions:\n\n1. TWITTER/X: under 280 characters, punchy and direct, no engagement-bait clichés (\"You won't believe...\", \"Thread below\"), 0-2 relevant hashtags maximum only if genuinely fitting.\n\n2. LINKEDIN: 80-150 words, professional but not corporate-stiff, written like a practitioner sharing a real observation, ends with a light question or discussion prompt, no hashtags, no emojis.\n\nFor EACH caption, also write a matching image generation prompt: a concrete visual description (subject, style, mood, composition) suitable for an AI image generator, under 40 words, no text-in-image requests.\n\nOutput ONLY valid JSON, no markdown fences, no preamble, in this exact structure:\n{\"twitter\": {\"caption\": \"...\", \"imagePrompt\": \"...\"}, \"linkedin\": {\"caption\": \"...\", \"imagePrompt\": \"...\"}}"
+                  }
+                ]
+              }
+            ],
+            "generationConfig": {
+              "responseMimeType": "application/json",
+              "maxOutputTokens": 2000,
+              "temperature": 0.7
+            }
+          }
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "topic": "AI won't solve the work-theater problem",
+          "permalink": "https://news.ycombinator.com/item?id=49347015",
+          "requestBody": {
+            "contents": [
+              {
+                "role": "user",
+                "parts": [
+                  {
+                    "text": "You are a social media copywriter for an AI tools and automation brand. Turn the trending topic below into ready-to-post captions.\n\nTopic: AI won't solve the work-theater problem\n\nWrite two captions:\n\n1. TWITTER/X: under 280 characters, punchy and direct, no engagement-bait clichés (\"You won't believe...\", \"Thread below\"), 0-2 relevant hashtags maximum only if genuinely fitting.\n\n2. LINKEDIN: 80-150 words, professional but not corporate-stiff, written like a practitioner sharing a real observation, ends with a light question or discussion prompt, no hashtags, no emojis.\n\nFor EACH caption, also write a matching image generation prompt: a concrete visual description (subject, style, mood, composition) suitable for an AI image generator, under 40 words, no text-in-image requests.\n\nOutput ONLY valid JSON, no markdown fences, no preamble, in this exact structure:\n{\"twitter\": {\"caption\": \"...\", \"imagePrompt\": \"...\"}, \"linkedin\": {\"caption\": \"...\", \"imagePrompt\": \"...\"}}"
+                  }
+                ]
+              }
+            ],
+            "generationConfig": {
+              "responseMimeType": "application/json",
+              "maxOutputTokens": 2000,
+              "temperature": 0.7
+            }
+          }
+        },
+        "pairedItem": {
+          "item": 1
+        }
+      },
+      {
+        "json": {
+          "topic": "Show HN: I canceled my AI code reviewer and wrote a free local one",
+          "permalink": "https://news.ycombinator.com/item?id=49345154",
+          "requestBody": {
+            "contents": [
+              {
+                "role": "user",
+                "parts": [
+                  {
+                    "text": "You are a social media copywriter for an AI tools and automation brand. Turn the trending topic below into ready-to-post captions.\n\nTopic: Show HN: I canceled my AI code reviewer and wrote a free local one\n\nWrite two captions:\n\n1. TWITTER/X: under 280 characters, punchy and direct, no engagement-bait clichés (\"You won't believe...\", \"Thread below\"), 0-2 relevant hashtags maximum only if genuinely fitting.\n\n2. LINKEDIN: 80-150 words, professional but not corporate-stiff, written like a practitioner sharing a real observation, ends with a light question or discussion prompt, no hashtags, no emojis.\n\nFor EACH caption, also write a matching image generation prompt: a concrete visual description (subject, style, mood, composition) suitable for an AI image generator, under 40 words, no text-in-image requests.\n\nOutput ONLY valid JSON, no markdown fences, no preamble, in this exact structure:\n{\"twitter\": {\"caption\": \"...\", \"imagePrompt\": \"...\"}, \"linkedin\": {\"caption\": \"...\", \"imagePrompt\": \"...\"}}"
+                  }
+                ]
+              }
+            ],
+            "generationConfig": {
+              "responseMimeType": "application/json",
+              "maxOutputTokens": 2000,
+              "temperature": 0.7
+            }
+          }
+        },
+        "pairedItem": {
+          "item": 2
+        }
+      }
+    ],
+    "Generate Captions": [
+      {
+        "json": {
+          "candidates": [
+            {
+              "content": {
+                "parts": [
+                  {
+                    "text": "{\n  \"twitter\": {\n    \"caption\": \"AI is shifting from dev assistant to strategic partner in software teams. We're seeing more intelligent patterns emerge: AI for testing, automated documentation, and smarter project insights, not just code completion. Efficiency amplified. #AIinDev\",\n    \"imagePrompt\": \"Abstract digital brain with glowing neural pathways, integrated with code snippets and gears, symbolizing AI's role in software development. Modern, high-tech, blue and purple tones.\"\n  },\n  \"linkedin\": {\n    \"caption\": \"Observing a fascinating evolution in how software teams are leveraging AI. It's no longer just about code completion or basic assistance; we're seeing a much deeper integration. Teams are deploying AI for sophisticated tasks like automated test case generation, intelligent bug detection, and even dynamic documentation updates, significantly streamlining workflows. Project managers are also tapping into AI for predictive analytics, optimizing resource allocation and sprint planning. This shift moves AI from a helpful tool to a strategic component, enhancing efficiency and fostering innovation across the entire development lifecycle. It's exciting to watch how these patterns are emerging and transforming traditional practices. What notable AI integrations have you observed in your software development environment?\",\n    \"imagePrompt\": \"Diverse software development team collaborating around a glowing holographic interface displaying AI-driven insights, code, and project timelines. Modern office, future-tech aesthetic, collaborative mood.\"\n  }\n}"
+                  }
+                ],
+                "role": "model"
+              },
+              "finishReason": "STOP",
+              "index": 0
+            }
+          ],
+          "usageMetadata": {
+            "promptTokenCount": 234,
+            "candidatesTokenCount": 295,
+            "totalTokenCount": 1697,
+            "promptTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 234
+              }
+            ],
+            "thoughtsTokenCount": 1168,
+            "serviceTier": "standard"
+          },
+          "modelVersion": "gemini-2.5-flash",
+          "responseId": "LqaFaqzvBvPbvdIPqMftkQ4"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "candidates": [
+            {
+              "content": {
+                "parts": [
+                  {
+                    "text": "{\n  \"twitter\": {\n    \"caption\": \"AI can automate tasks, but it won't fix 'work theater' – the performative busywork that adds no real value. True productivity requires more than just faster tools. It needs a culture shift. #AI #Productivity\",\n    \"imagePrompt\": \"A robot struggling to push an oversized, clearly fake, cardboard box across an office. Corporate setting, slightly absurd, muted colors.\"\n  },\n  \"linkedin\": {\n    \"caption\": \"We're seeing incredible advancements in AI's ability to automate tedious tasks, freeing up valuable time. Yet, there's a growing conversation around 'work theater' – the performative busywork that often fills those newly freed hours, rather than genuine strategic output. AI is a powerful tool for efficiency, but it doesn't inherently solve deeper cultural issues like the pressure to appear constantly busy, or the mismeasurement of productivity. The real challenge isn't just automating tasks, but redesigning work processes and expectations to foster meaningful contribution. How do you see AI influencing the way we define and measure true productivity in your organization?\",\n    \"imagePrompt\": \"An advanced AI robot in a modern office looking perplexed at a stack of obviously pointless paper reports. Clean, professional style, slightly contemplative mood.\"\n  }\n}"
+                  }
+                ],
+                "role": "model"
+              },
+              "finishReason": "STOP",
+              "index": 0
+            }
+          ],
+          "usageMetadata": {
+            "promptTokenCount": 238,
+            "candidatesTokenCount": 276,
+            "totalTokenCount": 1214,
+            "promptTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 238
+              }
+            ],
+            "thoughtsTokenCount": 700,
+            "serviceTier": "standard"
+          },
+          "modelVersion": "gemini-2.5-flash",
+          "responseId": "LqaFauyyBJnzvdIPvIGTYQ"
+        },
+        "pairedItem": {
+          "item": 1
+        }
+      },
+      {
+        "json": {
+          "candidates": [
+            {
+              "content": {
+                "parts": [
+                  {
+                    "text": "{\"twitter\": {\"caption\": \"Dev canceled their paid AI code reviewer, built a free local one instead. This is the innovation we love to see in AI. Cost-effective, customized solutions are emerging fast. #AICodeReview\", \"imagePrompt\": \"A developer character, futuristic, sitting at a desk, coding on a glowing laptop. Green lines of code flow from screen to a local server icon. Cyberpunk aesthetic, focused mood.\"}, \"linkedin\": {\"caption\": \"An interesting development caught my eye on Show HN recently: a developer opted to cancel their paid AI code reviewer subscription and instead built a free, local alternative. This story really underscores a powerful trend we're observing in the AI and automation space. While commercial SaaS solutions offer incredible convenience, the drive for customization, cost efficiency, and data privacy is increasingly pushing skilled practitioners to develop their own in-house, open-source, or local AI tools. It's a testament to the accessibility of AI frameworks and the ingenuity within the developer community. This shift isn't about rejecting commercial tools entirely, but rather about leveraging them smarter or building bespoke solutions where it makes strategic sense. What balance are you striking between off-the-shelf AI services and custom-built automation in your projects?\", \"imagePrompt\": \"A professional, thoughtful developer sketching architectural diagrams for local AI on a transparent screen. Background is a modern, clean office. Collaborative, innovative mood, digital art style.\"}}"
+                  }
+                ],
+                "role": "model"
+              },
+              "finishReason": "STOP",
+              "index": 0
+            }
+          ],
+          "usageMetadata": {
+            "promptTokenCount": 243,
+            "candidatesTokenCount": 294,
+            "totalTokenCount": 1567,
+            "promptTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 243
+              }
+            ],
+            "thoughtsTokenCount": 1030,
+            "serviceTier": "standard"
+          },
+          "modelVersion": "gemini-2.5-flash",
+          "responseId": "LqaFaseND-WJxN8P74HJ8Ak"
+        },
+        "pairedItem": {
+          "item": 2
+        }
+      }
+    ],
+    "Parse and Reshape Captions": [
+      {
+        "json": {
+          "dateAdded": "2026-08-19T18:12:59.112Z",
+          "topic": "AI usage patterns in software teams",
+          "platform": "Twitter",
+          "caption": "AI is shifting from dev assistant to strategic partner in software teams. We're seeing more intelligent patterns emerge: AI for testing, automated documentation, and smarter project insights, not just code completion. Efficiency amplified. #AIinDev",
+          "imagePrompt": "Abstract digital brain with glowing neural pathways, integrated with code snippets and gears, symbolizing AI's role in software development. Modern, high-tech, blue and purple tones.",
+          "status": "Draft",
+          "sourceUrl": "https://news.ycombinator.com/item?id=49353432"
+        }
+      },
+      {
+        "json": {
+          "dateAdded": "2026-08-19T18:12:59.112Z",
+          "topic": "AI usage patterns in software teams",
+          "platform": "LinkedIn",
+          "caption": "Observing a fascinating evolution in how software teams are leveraging AI. It's no longer just about code completion or basic assistance; we're seeing a much deeper integration. Teams are deploying AI for sophisticated tasks like automated test case generation, intelligent bug detection, and even dynamic documentation updates, significantly streamlining workflows. Project managers are also tapping into AI for predictive analytics, optimizing resource allocation and sprint planning. This shift moves AI from a helpful tool to a strategic component, enhancing efficiency and fostering innovation across the entire development lifecycle. It's exciting to watch how these patterns are emerging and transforming traditional practices. What notable AI integrations have you observed in your software development environment?",
+          "imagePrompt": "Diverse software development team collaborating around a glowing holographic interface displaying AI-driven insights, code, and project timelines. Modern office, future-tech aesthetic, collaborative mood.",
+          "status": "Draft",
+          "sourceUrl": "https://news.ycombinator.com/item?id=49353432"
+        }
+      },
+      {
+        "json": {
+          "dateAdded": "2026-08-19T18:12:59.112Z",
+          "topic": "AI won't solve the work-theater problem",
+          "platform": "Twitter",
+          "caption": "AI can automate tasks, but it won't fix 'work theater' – the performative busywork that adds no real value. True productivity requires more than just faster tools. It needs a culture shift. #AI #Productivity",
+          "imagePrompt": "A robot struggling to push an oversized, clearly fake, cardboard box across an office. Corporate setting, slightly absurd, muted colors.",
+          "status": "Draft",
+          "sourceUrl": "https://news.ycombinator.com/item?id=49347015"
+        }
+      },
+      {
+        "json": {
+          "dateAdded": "2026-08-19T18:12:59.112Z",
+          "topic": "AI won't solve the work-theater problem",
+          "platform": "LinkedIn",
+          "caption": "We're seeing incredible advancements in AI's ability to automate tedious tasks, freeing up valuable time. Yet, there's a growing conversation around 'work theater' – the performative busywork that often fills those newly freed hours, rather than genuine strategic output. AI is a powerful tool for efficiency, but it doesn't inherently solve deeper cultural issues like the pressure to appear constantly busy, or the mismeasurement of productivity. The real challenge isn't just automating tasks, but redesigning work processes and expectations to foster meaningful contribution. How do you see AI influencing the way we define and measure true productivity in your organization?",
+          "imagePrompt": "An advanced AI robot in a modern office looking perplexed at a stack of obviously pointless paper reports. Clean, professional style, slightly contemplative mood.",
+          "status": "Draft",
+          "sourceUrl": "https://news.ycombinator.com/item?id=49347015"
+        }
+      },
+      {
+        "json": {
+          "dateAdded": "2026-08-19T18:12:59.112Z",
+          "topic": "Show HN: I canceled my AI code reviewer and wrote a free local one",
+          "platform": "Twitter",
+          "caption": "Dev canceled their paid AI code reviewer, built a free local one instead. This is the innovation we love to see in AI. Cost-effective, customized solutions are emerging fast. #AICodeReview",
+          "imagePrompt": "A developer character, futuristic, sitting at a desk, coding on a glowing laptop. Green lines of code flow from screen to a local server icon. Cyberpunk aesthetic, focused mood.",
+          "status": "Draft",
+          "sourceUrl": "https://news.ycombinator.com/item?id=49345154"
+        }
+      },
+      {
+        "json": {
+          "dateAdded": "2026-08-19T18:12:59.112Z",
+          "topic": "Show HN: I canceled my AI code reviewer and wrote a free local one",
+          "platform": "LinkedIn",
+          "caption": "An interesting development caught my eye on Show HN recently: a developer opted to cancel their paid AI code reviewer subscription and instead built a free, local alternative. This story really underscores a powerful trend we're observing in the AI and automation space. While commercial SaaS solutions offer incredible convenience, the drive for customization, cost efficiency, and data privacy is increasingly pushing skilled practitioners to develop their own in-house, open-source, or local AI tools. It's a testament to the accessibility of AI frameworks and the ingenuity within the developer community. This shift isn't about rejecting commercial tools entirely, but rather about leveraging them smarter or building bespoke solutions where it makes strategic sense. What balance are you striking between off-the-shelf AI services and custom-built automation in your projects?",
+          "imagePrompt": "A professional, thoughtful developer sketching architectural diagrams for local AI on a transparent screen. Background is a modern, clean office. Collaborative, innovative mood, digital art style.",
+          "status": "Draft",
+          "sourceUrl": "https://news.ycombinator.com/item?id=49345154"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Trigger": {
+      "main": [
+        [
+          {
+            "node": "Pull Trending Topics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pull Trending Topics": {
+      "main": [
+        [
+          {
+            "node": "Parse and Rank Topics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse and Rank Topics": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Split Into Individual Topics",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Zero Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Caption Request": {
+      "main": [
+        [
+          {
+            "node": "Generate Captions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Captions": {
+      "main": [
+        [
+          {
+            "node": "Parse and Reshape Captions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Into Individual Topics": {
+      "main": [
+        [
+          {
+            "node": "Build Caption Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse and Reshape Captions": {
+      "main": [
+        [
+          {
+            "node": "Log to Google Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "35156d23-fbea-45bf-a4f0-a252ce1f3716",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "a2f303ca0d2af5b9ad43ebe3c5096b7aea7fa4f9d47d4153b2a346300f353e46"
+  },
+  "nodeGroups": [],
+  "id": "03cl7Nb3He67ewl2",
+  "tags": []
+}
