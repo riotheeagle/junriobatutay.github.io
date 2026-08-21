@@ -47,8 +47,8 @@ and a downloadable workflow export.
 No build tools or dependencies — it's a static HTML file.
 
 ```bash
-git clone https://github.com/yourusername/yourusername.github.io.git
-cd yourusername.github.io
+git clone https://github.com/riotheeagle/portfolio.git
+cd portfolio
 open index.html   # or just double-click it
 ```
 
