@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Junrio Batutay — AI Workflow &amp; Automation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;0,9..144,600;1,9..144,400&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #0e0e0d;
+    --bg-raised: #161614;
+    --line: #2a2a26;
+    --amber: #ff8a2b;
+    --amber-dim: #b3611a;
+    --paper: #f3ede2;
+    --paper-dim: #b8b2a6;
+    --mono: 'JetBrains Mono', monospace;
+    --serif: 'Fraunces', serif;
+  }
+
+  *{ margin:0; padding:0; box-sizing:border-box; }
+
+  html{ scroll-behavior:smooth; }
+
+  body{
+    background: var(--bg);
+    color: var(--paper);
+    font-family: var(--mono);
+    font-size: 15px;
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+
+  /* subtle grid texture */
+  body::before{
+    content:'';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(var(--line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line) 1px, transparent 1px);
+    background-size: 64px 64px;
+    opacity: 0.35;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* grain overlay */
+  body::after{
+    content:'';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+    opacity: 0.05;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  .wrap{ position: relative; z-index: 2; }
+
+  a{ color: inherit; }
+
+  ::selection{ background: var(--amber); color: var(--bg); }
+
+  /* ---------- NAV ---------- */
+  nav{
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 50;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 22px 48px;
+    backdrop-filter: blur(10px);
+    background: rgba(14,14,13,0.7);
+    border-bottom: 1px solid var(--line);
+  }
+  .logo{
+    font-family: var(--mono);
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--amber);
+  }
+  .logo span{ color: var(--paper-dim); }
+  .nav-links{ display: flex; gap: 32px; list-style: none; }
+  .nav-links a{
+    text-decoration: none;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--paper-dim);
+    transition: color 0.2s;
+    position: relative;
+  }
+  .nav-links a:hover{ color: var(--paper); }
+
+  /* ---------- HERO ---------- */
+  header.hero{
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 0 48px;
+    position: relative;
+  }
+
+  .hero-tag{
+    font-size: 12px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--amber);
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .hero-tag::before{
+    content:'';
+    width: 8px; height: 8px;
+    background: var(--amber);
+    border-radius: 50%;
+    box-shadow: 0 0 12px var(--amber);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse{
+    0%,100%{ opacity: 1; }
+    50%{ opacity: 0.35; }
+  }
+
+  h1.hero-title{
+    font-family: var(--serif);
+    font-weight: 500;
+    font-size: clamp(48px, 8vw, 108px);
+    line-height: 0.98;
+    letter-spacing: -0.02em;
+    max-width: 950px;
+  }
+  h1.hero-title em{
+    font-style: italic;
+    font-weight: 300;
+    color: var(--paper-dim);
+  }
+
+  .hero-sub{
+    margin-top: 32px;
+    max-width: 560px;
+    font-size: 15px;
+    color: var(--paper-dim);
+    line-height: 1.7;
+  }
+
+  .hero-cta{
+    margin-top: 44px;
+    display: flex;
+    gap: 16px;
+    align-items: center;
+  }
+  .btn{
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    text-decoration: none;
+    padding: 15px 28px;
+    border: 1px solid var(--amber);
+    color: var(--bg);
+    background: var(--amber);
+    transition: all 0.25s ease;
+    display: inline-block;
+  }
+  .btn:hover{ background: transparent; color: var(--amber); }
+  .btn-ghost{
+    background: transparent;
+    color: var(--paper);
+    border: 1px solid var(--line);
+  }
+  .btn-ghost:hover{ border-color: var(--paper-dim); }
+
+  /* animated node graph in hero */
+  .node-graph{
+    position: absolute;
+    right: 0;
+    top: 0;
+    width: 55%;
+    height: 100%;
+    z-index: -1;
+    opacity: 0.9;
+  }
+  @media (max-width: 900px){ .node-graph{ display:none; } }
+
+  .node-graph svg{ width: 100%; height: 100%; }
+  .node-graph circle{ fill: var(--bg-raised); stroke: var(--amber-dim); stroke-width: 1; }
+  .node-graph .active{ stroke: var(--amber); }
+  .node-graph line{
+    stroke: var(--line);
+    stroke-width: 1;
+  }
+  .node-graph .flow{
+    stroke: var(--amber);
+    stroke-width: 1.5;
+    stroke-dasharray: 6 10;
+    animation: flow 3s linear infinite;
+    opacity: 0.7;
+  }
+  @keyframes flow{
+    to{ stroke-dashoffset: -160; }
+  }
+
+  section{
+    padding: 140px 48px;
+    max-width: 1180px;
+    margin: 0 auto;
+    position: relative;
+  }
+
+  .kicker{
+    font-size: 12px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--amber);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .kicker::after{
+    content:'';
+    flex: 1;
+    height: 1px;
+    background: var(--line);
+  }
+  .kicker-num{ color: var(--paper-dim); }
+
+  h2.section-title{
+    font-family: var(--serif);
+    font-weight: 500;
+    font-size: clamp(32px, 4vw, 52px);
+    letter-spacing: -0.01em;
+    margin-bottom: 48px;
+    max-width: 700px;
+  }
+
+  /* ---------- ABOUT ---------- */
+  .about-grid{
+    display: grid;
+    grid-template-columns: 1.1fr 0.9fr;
+    gap: 80px;
+    align-items: start;
+  }
+  @media (max-width: 800px){ .about-grid{ grid-template-columns: 1fr; } }
+
+  .about-text p{
+    color: var(--paper-dim);
+    margin-bottom: 20px;
+    font-size: 15px;
+    line-height: 1.8;
+    max-width: 520px;
+  }
+  .about-text strong{ color: var(--paper); font-weight: 500; }
+
+  .stat-block{
+    border-top: 1px solid var(--line);
+    padding-top: 20px;
+    margin-top: 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+  .stat{ display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid var(--line); padding-bottom: 20px; }
+  .stat-label{ font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--paper-dim); }
+  .stat-value{ font-family: var(--serif); font-size: 28px; color: var(--amber); }
+
+  /* ---------- SKILLS ---------- */
+  .skills-grid{
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+  }
+  @media (max-width: 800px){ .skills-grid{ grid-template-columns: 1fr; } }
+
+  .skill-card{
+    background: var(--bg);
+    padding: 36px 32px;
+  }
+  .skill-card h3{
+    font-family: var(--serif);
+    font-weight: 500;
+    font-size: 20px;
+    margin-bottom: 18px;
+    color: var(--paper);
+  }
+  .skill-card ul{ list-style: none; display: flex; flex-direction: column; gap: 10px; }
+  .skill-card li{
+    font-size: 13px;
+    color: var(--paper-dim);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .skill-card li::before{
+    content:'→';
+    color: var(--amber-dim);
+  }
+
+  /* ---------- PROJECTS ---------- */
+  .project{
+    border-top: 1px solid var(--line);
+    padding: 48px 0;
+    display: grid;
+    grid-template-columns: 220px 1fr 260px;
+    gap: 40px;
+  }
+  .project:last-child{ border-bottom: 1px solid var(--line); }
+  @media (max-width: 900px){ .project{ grid-template-columns: 1fr; gap: 20px; } }
+
+  .project-index{
+    font-family: var(--serif);
+    font-size: 15px;
+    color: var(--paper-dim);
+  }
+  .project-status{
+    display: inline-block;
+    margin-top: 12px;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    border: 1px solid var(--amber-dim);
+    color: var(--amber);
+  }
+
+  .project-title{
+    font-family: var(--serif);
+    font-size: 26px;
+    font-weight: 500;
+    margin-bottom: 12px;
+    color: var(--paper);
+  }
+  .project-desc{ color: var(--paper-dim); font-size: 14px; line-height: 1.75; max-width: 560px; }
+  .project-desc .placeholder{ color: var(--amber-dim); font-style: italic; }
+
+  .project-meta{ display: flex; flex-direction: column; gap: 16px; }
+  .project-tools{ display: flex; flex-wrap: wrap; gap: 8px; }
+  .tag{
+    font-size: 10px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 5px 10px;
+    border: 1px solid var(--line);
+    color: var(--paper-dim);
+  }
+  .project-link{
+    font-size: 12px;
+    color: var(--amber);
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    width: fit-content;
+  }
+  .project-link:hover{ text-decoration: underline; }
+
+  /* ---------- PROJECT (rich, built) ---------- */
+  .project-full{
+    border-top: 1px solid var(--line);
+    padding: 56px 0;
+  }
+  .project-full:last-child{ border-bottom: 1px solid var(--line); }
+
+  .project-head{
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 40px;
+    flex-wrap: wrap;
+    margin-bottom: 28px;
+  }
+  .project-head-left{ max-width: 620px; }
+  .project-status.live{ border-color: var(--amber); color: var(--amber); background: rgba(255,138,43,0.08); }
+  .project-status.planned{ color: var(--paper-dim); border-color: var(--line); }
+
+  .project-summary{ color: var(--paper-dim); font-size: 14px; line-height: 1.8; margin-top: 14px; }
+  .project-summary strong{ color: var(--paper); font-weight: 500; }
+
+  .project-side{ display: flex; flex-direction: column; gap: 14px; align-items: flex-end; }
+  @media (max-width: 700px){ .project-side{ align-items: flex-start; } }
+
+  .json-link{
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--amber);
+    text-decoration: none;
+    border: 1px solid var(--amber-dim);
+    padding: 8px 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+  }
+  .json-link:hover{ background: var(--amber); color: var(--bg); }
+
+  .media-caption{
+    font-size: 11px;
+    color: var(--paper-dim);
+    margin-top: 8px;
+    text-align: center;
+    letter-spacing: 0.02em;
+  }
+
+  .media-row{
+    display: grid;
+    grid-template-columns: 1.3fr 1fr;
+    gap: 24px;
+    margin-bottom: 24px;
+  }
+  @media (max-width: 900px){ .media-row{ grid-template-columns: 1fr; } }
+
+  .media-box{
+    border: 1px solid var(--line);
+    background: var(--bg-raised);
+    padding: 10px;
+  }
+  .media-box img, .media-box video{
+    width: 100%;
+    display: block;
+  }
+
+  .output-strip{
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+    margin-top: 20px;
+  }
+  @media (max-width: 700px){ .output-strip{ grid-template-columns: 1fr; } }
+
+  .output-strip .media-box img{ max-height: 340px; object-fit: cover; object-position: top; }
+
+  .notes-block{
+    margin-top: 28px;
+    padding: 20px 24px;
+    border-left: 2px solid var(--amber-dim);
+    background: var(--bg-raised);
+  }
+  .notes-block p{ font-size: 13px; color: var(--paper-dim); line-height: 1.75; }
+  .notes-block p + p{ margin-top: 10px; }
+  .notes-block strong{ color: var(--paper); font-weight: 500; }
+
+  /* ---------- CONTACT ---------- */
+  footer{
+    padding: 140px 48px 60px;
+    max-width: 1180px;
+    margin: 0 auto;
+    text-align: center;
+  }
+  .contact-title{
+    font-family: var(--serif);
+    font-weight: 500;
+    font-size: clamp(40px, 6vw, 76px);
+    letter-spacing: -0.02em;
+    margin-bottom: 32px;
+  }
+  .contact-title em{ font-style: italic; color: var(--amber); }
+  .contact-links{
+    display: flex;
+    justify-content: center;
+    gap: 36px;
+    margin-top: 40px;
+    flex-wrap: wrap;
+  }
+  .contact-links a{
+    text-decoration: none;
+    font-size: 13px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--paper-dim);
+    border-bottom: 1px solid transparent;
+    padding-bottom: 4px;
+    transition: 0.2s;
+  }
+  .contact-links a:hover{ color: var(--amber); border-color: var(--amber); }
+
+  .foot-note{
+    margin-top: 100px;
+    font-size: 11px;
+    color: var(--line);
+    letter-spacing: 0.05em;
+  }
+  .foot-note strong{ color: var(--paper-dim); }
+
+  .reveal{
+    opacity: 0;
+    transform: translateY(24px);
+    transition: opacity 0.8s ease, transform 0.8s ease;
+  }
+  .reveal.in{ opacity: 1; transform: translateY(0); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <nav>
+    <div class="logo">JUNRIO BATUTAY <span>// automation & ai systems</span></div>
+    <ul class="nav-links">
+      <li><a href="#about">About</a></li>
+      <li><a href="#skills">Skills</a></li>
+      <li><a href="#work">Work</a></li>
+      <li><a href="#contact">Contact</a></li>
+    </ul>
+  </nav>
+
+  <header class="hero">
+    <div class="node-graph">
+      <svg viewBox="0 0 600 700" fill="none">
+        <line x1="80" y1="150" x2="260" y2="220" />
+        <line x1="80" y1="380" x2="260" y2="220" />
+        <line x1="260" y1="220" x2="440" y2="140" />
+        <line x1="260" y1="220" x2="440" y2="300" />
+        <line x1="440" y1="300" x2="560" y2="240" />
+        <line x1="440" y1="300" x2="560" y2="420" />
+        <line x1="80" y1="380" x2="260" y2="480" />
+        <line x1="260" y1="480" x2="440" y2="440" />
+        <line x1="260" y1="480" x2="440" y2="560" />
+
+        <line class="flow" x1="80" y1="150" x2="260" y2="220" />
+        <line class="flow" x1="260" y1="220" x2="440" y2="300" />
+        <line class="flow" x1="440" y1="300" x2="560" y2="420" />
+        <line class="flow" x1="80" y1="380" x2="260" y2="480" />
+        <line class="flow" x1="260" y1="480" x2="440" y2="560" />
+
+        <circle class="active" cx="80" cy="150" r="8" />
+        <circle cx="80" cy="380" r="8" />
+        <circle class="active" cx="260" cy="220" r="10" />
+        <circle cx="260" cy="480" r="10" />
+        <circle cx="440" cy="140" r="7" />
+        <circle class="active" cx="440" cy="300" r="9" />
+        <circle cx="440" cy="440" r="7" />
+        <circle class="active" cx="440" cy="560" r="8" />
+        <circle cx="560" cy="240" r="6" />
+        <circle class="active" cx="560" cy="420" r="8" />
+      </svg>
+    </div>
+
+    <div class="hero-tag">Currently building</div>
+    <h1 class="hero-title">I design systems<br>that <em>run themselves</em>.</h1>
+    <p class="hero-sub">
+      I build AI-powered automations — workflows, content pipelines, and agents — using n8n
+      and large language models. No agency background. Just a habit of shipping working systems
+      and figuring out the rest along the way.
+    </p>
+    <div class="hero-cta">
+      <a href="#work" class="btn">View the work</a>
+      <a href="#contact" class="btn btn-ghost">Get in touch</a>
+    </div>
+  </header>
+
+  <section id="about" class="reveal">
+    <div class="kicker"><span class="kicker-num">01</span> About</div>
+    <div class="about-grid">
+      <div class="about-text">
+        <p>
+          I'm <strong>Junrio Batutay</strong>, and I build automations for a living I haven't started yet.
+          Over the past 6, I've taught myself <strong>n8n</strong>, worked through real
+          integration problems, and connected it to AI models to build systems that turn raw
+          input — text, video, form data — into finished, usable output.
+        </p>
+        <p>
+          I don't have a job title in this field yet. What I have is a growing set of workflows
+          that actually run, break, get debugged, and run again. I care about the same things a
+          hired automation engineer cares about: reliability, clean error handling, and building
+          something a non-technical person could actually use.
+        </p>
+        <p>
+          I'm looking for freelance work, an entry-level role, or a first client willing to take
+          a chance on someone who learns fast and ships.
+        </p>
+      </div>
+      <div class="stat-block">
+        <div class="stat"><span class="stat-label">Workflows built</span><span class="stat-value">10+</span></div>
+        <div class="stat"><span class="stat-label">AI models integrated</span><span class="stat-value">Claude · Gemini</span></div>
+        <div class="stat"><span class="stat-label">Months hands-on</span><span class="stat-value">6</span></div>
+        <div class="stat"><span class="stat-label">Based in</span><span class="stat-value">Cebu City, PH</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="skills" class="reveal">
+    <div class="kicker"><span class="kicker-num">02</span> Capabilities</div>
+    <h2 class="section-title">What I actually know how to do.</h2>
+    <div class="skills-grid">
+      <div class="skill-card">
+        <h3>Automation</h3>
+        <ul>
+          <li>n8n workflow design</li>
+          <li>Webhooks & API integrations</li>
+          <li>Scheduled / triggered jobs</li>
+          <li>Error handling & retries</li>
+          <li>Zapier / Make (if applicable)</li>
+        </ul>
+      </div>
+      <div class="skill-card">
+        <h3>AI &amp; Content</h3>
+        <ul>
+          <li>Prompt engineering</li>
+          <li>LLM API integration (OpenAI, Claude)</li>
+          <li>Content repurposing pipelines</li>
+          <li>AI copywriting & summarization</li>
+          <li>Image/video generation tools</li>
+        </ul>
+      </div>
+      <div class="skill-card">
+        <h3>Delivery</h3>
+        <ul>
+          <li>Google Sheets / Notion / Airtable</li>
+          <li>Slack & email integrations</li>
+          <li>CRM & lead workflows</li>
+          <li>Basic JSON / data transformation</li>
+          <li>Client-facing documentation</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section id="work" class="reveal">
+    <div class="kicker"><span class="kicker-num">03</span> Selected work</div>
+    <h2 class="section-title">Projects, planned and in progress.</h2>
+
+    <!-- 001 — Content Repurposing Pipeline -->
+    <div class="project-full">
+      <div class="project-head">
+        <div class="project-head-left">
+          <div class="project-index">001</div>
+          <div class="project-title">AI Content Repurposing Pipeline</div>
+          <div class="project-status live">Live</div>
+          <p class="project-summary">
+            Takes a raw video/podcast transcript and turns it into three finished pieces —
+            a <strong>blog post</strong>, a <strong>tweet thread</strong>, and a <strong>LinkedIn post</strong> —
+            each generated by its own dedicated AI call so every output can be debugged and tuned
+            independently, then compiled into a single Google Doc for review. Built-in error
+            handling notifies via Telegram if any generation step fails, rather than producing a
+            silently incomplete doc.
+          </p>
+        </div>
+        <div class="project-side">
+          <div class="project-tools">
+            <span class="tag">n8n</span><span class="tag">Gemini API</span><span class="tag">Google Docs</span><span class="tag">Telegram</span>
+          </div>
+          <a href="assets/content-repurposing/workflow.json" download class="json-link">↓ Download workflow.json</a>
+        </div>
+      </div>
+
+      <div class="media-row">
+        <div class="media-box">
+          <img src="assets/content-repurposing/workflow.png" alt="n8n canvas for the content repurposing pipeline">
+          <div class="media-caption">Full workflow canvas — input, process, output, and error-handling lanes</div>
+        </div>
+        <div class="media-box">
+          <img src="assets/content-repurposing/demo.gif" alt="Workflow run demo">
+          <div class="media-caption">End-to-end run, real time</div>
+        </div>
+      </div>
+
+      <div class="output-strip">
+        <div class="media-box">
+          <img src="assets/content-repurposing/input.png" alt="Form trigger with pasted transcript input">
+          <div class="media-caption">Input: pasted transcript via Form Trigger</div>
+        </div>
+        <div class="media-box">
+          <img src="assets/content-repurposing/output_1.png" alt="Generated blog post output">
+          <div class="media-caption">Output: AI-generated blog post (one of three)</div>
+        </div>
+      </div>
+
+      <div class="notes-block">
+        <p><strong>Why three separate AI calls, not one:</strong> generating the blog post, thread,
+        and LinkedIn post as distinct calls means each has its own tailored prompt and can fail or
+        be re-tuned independently — a single "do all three" call would be harder to debug when one
+        format alone comes out wrong.</p>
+        <p>Tested against a real 30-minute YouTube transcript on AI/accelerationism, with all three
+        outputs, retries, and the Telegram failure alerts verified end-to-end before calling it done.</p>
+      </div>
+    </div>
+
+    <!-- 002 — Automated Lead Triage -->
+    <div class="project-full">
+      <div class="project-head">
+        <div class="project-head-left">
+          <div class="project-index">002</div>
+          <div class="project-title">Automated Lead Triage &amp; Auto-Responder</div>
+          <div class="project-status live">Live</div>
+          <p class="project-summary">
+            Simulates how a small business could automatically qualify inbound leads. A webhook
+            receives a form submission, AI scores it <strong>Hot / Warm / Cold</strong> against an
+            explicit, documented rubric (not a black-box score), then drafts a personalized reply
+            matched to that urgency — everything logs to Google Sheets, with an immediate email
+            alert for Hot leads so nothing time-sensitive goes unnoticed.
+          </p>
+        </div>
+        <div class="project-side">
+          <div class="project-tools">
+            <span class="tag">n8n</span><span class="tag">Webhook</span><span class="tag">Gemini API</span><span class="tag">Google Sheets</span><span class="tag">Gmail</span>
+          </div>
+          <a href="assets/lead-triage/workflow.json" download class="json-link">↓ Download workflow.json</a>
+        </div>
+      </div>
+
+      <div class="media-row">
+        <div class="media-box">
+          <img src="assets/lead-triage/workflow.png" alt="n8n canvas for the lead triage workflow">
+          <div class="media-caption">Full workflow: validate → classify → draft reply → log → alert</div>
+        </div>
+        <div class="media-box">
+          <img src="assets/lead-triage/demo.gif" alt="Lead triage workflow run demo">
+          <div class="media-caption">End-to-end run, real time</div>
+        </div>
+      </div>
+
+      <div class="output-strip">
+        <div class="media-box">
+          <img src="assets/lead-triage/input.png" alt="Sample lead submission JSON payload">
+          <div class="media-caption">Input: a simulated lead submission</div>
+        </div>
+        <div class="media-box">
+          <img src="assets/lead-triage/output_sheet.png" alt="Logged leads with score and drafted reply in Google Sheets">
+          <div class="media-caption">Output: score, reasoning, and drafted reply logged per lead</div>
+        </div>
+      </div>
+      <div class="output-strip">
+        <div class="media-box">
+          <img src="assets/lead-triage/output_email.png" alt="Hot lead email alert, name and email redacted">
+          <div class="media-caption">Hot-lead email alert (sender identity redacted for this portfolio)</div>
+        </div>
+      </div>
+
+      <div class="notes-block">
+        <p><strong>The rubric is explicit, not a black box:</strong> the prompt spells out exactly
+        what makes a lead Hot, Warm, or Cold, and the AI returns a <em>hedgingLanguagePresent</em>
+        flag alongside its score — added after real testing surfaced a misclassification (a soft
+        timeline like "sometime before year-end, if it's the right fit" was over-scored as Hot).
+        That flag makes future misclassifications debuggable instead of mysterious.</p>
+        <p>Malformed submissions (missing fields, bad email format) are caught before they ever
+        reach the AI, so no API call is wasted validating garbage input.</p>
+      </div>
+    </div>
+
+    <!-- 003 — Daily Trend-to-Caption Queue -->
+    <div class="project-full">
+      <div class="project-head">
+        <div class="project-head-left">
+          <div class="project-index">003</div>
+          <div class="project-title">Daily AI-Tools Trend-to-Caption Queue</div>
+          <div class="project-status live">Live</div>
+          <p class="project-summary">
+            Runs every morning, pulls the day's top trending AI-tools discussions from Hacker News,
+            and uses AI to turn the top three into platform-specific social captions (Twitter +
+            LinkedIn) with matching image-generation prompts — all queued into a Google Sheet as
+            <strong>Drafts</strong> for human review. Nothing auto-posts.
+          </p>
+        </div>
+        <div class="project-side">
+          <div class="project-tools">
+            <span class="tag">n8n</span><span class="tag">Schedule Trigger</span><span class="tag">Hacker News API</span><span class="tag">Gemini API</span><span class="tag">Google Sheets</span>
+          </div>
+          <a href="assets/trend-caption/workflow.json" download class="json-link">↓ Download workflow.json</a>
+        </div>
+      </div>
+
+      <div class="media-row">
+        <div class="media-box">
+          <img src="assets/trend-caption/workflow.png" alt="n8n canvas for the trend-to-caption queue">
+          <div class="media-caption">Full workflow: pull trends → rank → generate captions → queue</div>
+        </div>
+        <div class="media-box">
+          <img src="assets/trend-caption/demo.gif" alt="Trend-to-caption workflow run demo">
+          <div class="media-caption">End-to-end run, real time</div>
+        </div>
+      </div>
+
+      <div class="output-strip">
+        <div class="media-box">
+          <img src="assets/trend-caption/output_sheet.png" alt="Queued captions and image prompts in Google Sheets">
+          <div class="media-caption">Output: captions + image prompts queued as Draft, ready for review</div>
+        </div>
+      </div>
+
+      <div class="notes-block">
+        <p><strong>Decoupled by design:</strong> the trend-pulling step knows nothing about the AI
+        captioning logic, and vice versa — everything downstream reads a normalized shape, not
+        Hacker News's raw response format. That decoupling got tested for real when the original
+        Reddit-based source turned out to hard-block n8n Cloud's IP range and had to be swapped for
+        Hacker News's API with zero changes to the AI logic.</p>
+        <p>A word-boundary filter and a rolling 24-hour window keep results genuinely "trending
+        today" rather than all-time high scorers — an early version without both filters surfaced a
+        years-old post simply because its title contained "ai" as a substring.</p>
+      </div>
+    </div>
+
+    <!-- 004 — planned -->
+    <div class="project">
+      <div>
+        <div class="project-index">004</div>
+        <div class="project-status">Planned</div>
+      </div>
+      <div>
+        <div class="project-title">Automated Newsletter Curator</div>
+        <div class="project-desc">
+          Pulls from a set of RSS feeds on a daily schedule, ranks and summarizes stories with AI,
+          formats into an HTML digest, and sends via email — fully hands-off.
+        </div>
+      </div>
+      <div class="project-meta">
+        <div class="project-tools">
+          <span class="tag">n8n</span><span class="tag">RSS</span><span class="tag">Gemini API</span><span class="tag">Gmail API</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer id="contact" class="reveal">
+    <div class="kicker" style="justify-content:center;"><span class="kicker-num">04</span> Contact</div>
+    <h2 class="contact-title">Let's build<br><em>something that runs.</em></h2>
+    <div class="contact-links">
+      <a href="mailto:junriobatutay@gmail.com">Email</a>
+      <a href="https://t.me/junrio">Telegram</a>
+      <a href="https://wa.me/639563055941">WhatsApp</a>
+    </div>
+    <div class="foot-note"><strong>JUNRIO BATUTAY</strong> — AI Workflow Automation & Content Systems — 2026</div>
+  </footer>
+
+</div>
+
+<script>
+  const revealEls = document.querySelectorAll('.reveal');
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => { if(e.isIntersecting) e.target.classList.add('in'); });
+  }, { threshold: 0.1 });
+  revealEls.forEach(el => io.observe(el));
+</script>
+
+</body>
+</html>
